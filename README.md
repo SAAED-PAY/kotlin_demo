@@ -13,7 +13,7 @@ DEMO/
 │   └── src/main/
 │       ├── kotlin/sa/saaedpay/demo/
 │       │   ├── DemoApp.kt          ← SDK initialization
-│       │   ├── MainActivity.kt     ← Setup, purchase, reset flows
+│       │   ├── MainActivity.kt     ← Setup, purchase, refund, reverse, reconcile, reset flows
 │       │   └── util/
 │       │       └── JsonFormatter.kt ← Pretty-print SDK responses
 │       ├── res/
@@ -178,7 +178,118 @@ SaaedPay.getInstance().purchase(
 
 ---
 
-## 6. Reset — `reset()`
+## 6. Refund — `refund()`
+
+`setup()` must complete before calling `refund()`. Pass the `retrievalReferenceNumber` (RRN) from the original purchase receipt.
+
+```kotlin
+val request = SaaedPayRefundRequest(
+    amount = 1000L,                                  // Amount to refund (halalas)
+    retrievalReferenceNumber = "RRN-FROM-RECEIPT",   // Required — from purchase receipt
+    customerReferenceNumber = "REF-001",             // Optional
+    enableReceiptUi = true,
+    enableReversal = true,
+    enableReversalImmediately = false,
+    finishTimeOut = 60L,
+    isUiDismissible = true
+)
+
+SaaedPay.getInstance().refund(
+    request = request,
+    callback = object : SaaedPayRefundCallback {
+        override fun onSuccess(result: SaaedPayRefundResult) {
+            // result.status           → "Refund Approved"
+            // result.transactionId    → unique transaction ID
+            // result.approvalCode     → issuer approval code
+            // result.amount           → refunded amount
+            // result.currency         → e.g. "SAR"
+            // result.receipts         → List<SaaedPayReceipt>
+        }
+        override fun onFailure(error: SaaedPayError) {
+            when (error.type) {
+                SaaedPayErrorType.REFUND_DECLINED       -> { /* declined */ }
+                SaaedPayErrorType.REFUND_REJECTED       -> { /* rejected */ }
+                SaaedPayErrorType.INVALID_ADMIN_PIN     -> { /* wrong PIN */ }
+                SaaedPayErrorType.AUTHENTICATION_FAILED -> { /* re-run setup() */ }
+                else -> { /* generic failure */ }
+            }
+        }
+    }
+)
+```
+
+---
+
+## 7. Reverse — `reverse()`
+
+Reverses a transaction that has not yet been settled. Requires the RRN of the transaction.
+
+```kotlin
+val request = SaaedPayReverseRequest(
+    retrievalReferenceNumber = "RRN-FROM-RECEIPT",  // Required
+    enableReceiptUi = true,
+    finishTimeOut = 60L,
+    isUiDismissible = true
+)
+
+SaaedPay.getInstance().reverse(
+    request = request,
+    callback = object : SaaedPayReverseCallback {
+        override fun onSuccess(result: SaaedPayReverseResult) {
+            // result.status           → "Reversal Completed"
+            // result.transactionId    → unique transaction ID
+            // result.receipts         → List<SaaedPayReceipt>
+        }
+        override fun onFailure(error: SaaedPayError) {
+            when (error.type) {
+                SaaedPayErrorType.REVERSAL_FAILED       -> { /* failed or rejected */ }
+                SaaedPayErrorType.AUTHENTICATION_FAILED -> { /* re-run setup() */ }
+                else -> { /* generic failure */ }
+            }
+        }
+    }
+)
+```
+
+---
+
+## 8. Reconcile — `reconcile()`
+
+Closes the current batch and returns a totals summary. Call once per business day or per shift.
+
+```kotlin
+SaaedPay.getInstance().reconcile(
+    request = SaaedPayReconcileRequest(
+        enableReceiptUi = true,
+        finishTimeOut = 60L,
+        isUiDismissible = true
+    ),
+    callback = object : SaaedPayReconcileCallback {
+        override fun onSuccess(result: SaaedPayReconcileResult) {
+            // result.isBalanced          → true if POS totals match host totals
+            // result.date / result.time  → reconciliation timestamp
+            // result.currency            → e.g. "SAR"
+            // result.totalPurchaseCount  → number of purchases
+            // result.totalPurchaseAmount → purchase total string
+            // result.totalRefundCount    → number of refunds
+            // result.totalRefundAmount   → refund total string
+            // result.totalAmount         → net total string
+        }
+        override fun onFailure(error: SaaedPayError) {
+            when (error.type) {
+                SaaedPayErrorType.RECONCILE_FAILED      -> { /* failed */ }
+                SaaedPayErrorType.INVALID_ADMIN_PIN     -> { /* wrong PIN */ }
+                SaaedPayErrorType.AUTHENTICATION_FAILED -> { /* re-run setup() */ }
+                else -> { /* generic failure */ }
+            }
+        }
+    }
+)
+```
+
+---
+
+## 9. Reset — `reset()`
 
 Clears all local state: JWT, terminal config, session. Call when logging out or switching terminals.
 
@@ -190,7 +301,7 @@ No callback — fire and forget. You must call `setup()` again before the next p
 
 ---
 
-## 7. Required permissions
+## 10. Required permissions
 
 The SDK merges these automatically. If you disabled manifest merging, add them manually:
 
@@ -201,7 +312,7 @@ The SDK merges these automatically. If you disabled manifest merging, add them m
 
 ---
 
-## 8. Min SDK / Target SDK
+## 11. Min SDK / Target SDK
 
 | Setting | Value |
 |---------|-------|
@@ -211,7 +322,7 @@ The SDK merges these automatically. If you disabled manifest merging, add them m
 
 ---
 
-## 9. Troubleshooting guide
+## 12. Troubleshooting guide
 
 ### "SaaedPay is not initialized"
 You called `SaaedPay.getInstance()` before `SaaedPay.init()`. Move `init()` to `Application.onCreate()`.
@@ -234,7 +345,7 @@ the cached result. Call `reset()` first to force a fresh setup.
 
 ---
 
-## 10. Common errors
+## 13. Common errors
 
 | Code | Type | Fix |
 |------|------|-----|
@@ -246,12 +357,17 @@ the cached result. Call `reset()` first to force a fresh setup.
 | 2003 | `INVALID_STATUS` | Terminal failed pre-flight checks (NFC off, permissions missing, etc.) |
 | 3000 | `PURCHASE_DECLINED` | Card declined by issuer |
 | 3001 | `PURCHASE_REJECTED` | Transaction rejected |
-| 4000 | `NOT_INITIALIZED` | Call `setup()` before `purchase()` |
+| 3100 | `REFUND_DECLINED` | Refund declined by issuer |
+| 3101 | `REFUND_REJECTED` | Refund rejected |
+| 3200 | `REVERSAL_FAILED` | Reversal failed or rejected |
+| 3300 | `RECONCILE_FAILED` | Reconciliation failed |
+| 3400 | `INVALID_ADMIN_PIN` | Admin PIN was incorrect |
+| 4000 | `NOT_INITIALIZED` | Call `setup()` before any payment operation |
 | 4001 | `OPERATION_IN_PROGRESS` | Wait for the current operation to finish |
 
 ---
 
-## 11. Release build notes
+## 14. Release build notes
 
 - Set `isMinifyEnabled = true` in your release build type for production.
 - The SDK ships `consumer-rules.pro` which is auto-applied — no extra ProGuard config needed.
@@ -259,7 +375,7 @@ the cached result. Call `reset()` first to force a fresh setup.
 
 ---
 
-## 12. ProGuard notes
+## 15. ProGuard notes
 
 The SDK's consumer rules are applied automatically when you depend on the AAR. If you use a
 custom ProGuard configuration, add:
