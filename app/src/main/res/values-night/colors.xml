@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- Brand — lighter on dark surfaces -->
+    <color name="color_primary">#7EB8E8</color>
+    <color name="color_on_primary">#0D2D42</color>
+    <color name="color_primary_container">#1A4A6B</color>
+    <color name="color_on_primary_container">#C8E6F8</color>
+    <color name="color_secondary">#5DBF87</color>
+    <color name="color_on_secondary">#0D2D1A</color>
+    <color name="color_surface">#1C1C1E</color>
+    <color name="color_background">#121212</color>
+
+    <!-- Status chips — slightly brighter for dark backgrounds -->
+    <color name="status_uninitialized">#9E9E9E</color>
+    <color name="status_loading">#4FC3F7</color>
+    <color name="status_ready">#66BB6A</color>
+    <color name="status_purchase">#FFA726</color>
+    <color name="status_error">#EF5350</color>
+
+</resources>

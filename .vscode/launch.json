@@ -1,0 +1,20 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "SaaedPay Demo — Debug",
+            "type": "android",
+            "request": "launch",
+            "packageName": "sa.saaedpay.demo",
+            "activity": "sa.saaedpay.demo.MainActivity",
+            "apkFile": "${workspaceFolder}/app/build/outputs/apk/debug/app-debug.apk",
+            "preLaunchTask": "Build Debug APK"
+        },
+        {
+            "name": "SaaedPay Demo — Attach",
+            "type": "android",
+            "request": "attach",
+            "packageName": "sa.saaedpay.demo"
+        }
+    ]
+}
